@@ -1,0 +1,28 @@
+version: "3"
+services:
+  proxy:
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - -email=john.doe@example.com
+      - -domains=example.com
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./certs:/var/lib/cert
+  agent:
+    restart: always
+    image: grafana/agent:latest
+    volumes:
+      - ./agent.yaml:/etc/agent-config/agent.yaml
+    entrypoint:
+      - /bin/grafana-agent
+      - -config.file=/etc/agent-config/agent.yaml
+      - -metrics.wal-directory=/tmp/agent/wal
+      - -enable-features=integrations-next
+      - -config.expand-env
+    depends_on:
+      - proxy
