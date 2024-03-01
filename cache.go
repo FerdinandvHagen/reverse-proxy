@@ -109,7 +109,7 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 
 	if !allowed {
 		log.Info().Str("content-type", contentType).Msg("not caching")
-		return c.transport.RoundTrip(request)
+		return response, err
 	}
 
 	content, err := io.ReadAll(response.Body)
