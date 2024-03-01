@@ -1,3 +1,4 @@
 certs
 agent.yaml
 docker-compose.yaml
+*.pem

@@ -399,24 +399,38 @@ func NewPotentiallyInsecureTransport(insecure bool) http.RoundTripper {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	if insecure {
-		// Allows insecure connection to private IP addresses if enabled
-		transport.TLSClientConfig = &tls.Config{
-			GetConfigForClient: func(info *tls.ClientHelloInfo) (*tls.Config, error) {
-				addr, ok := info.Conn.RemoteAddr().(*net.TCPAddr)
-
-				if ok && addr.IP.IsPrivate() {
-					return &tls.Config{
-						InsecureSkipVerify: true,
-					}, nil
-				}
-
-				return &tls.Config{}, nil
-			},
-		}
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: insecure,
+		},
 	}
 
 	return transport
+}
+
+func transformCertsToInternal(certPath string, keyPath string) error {
+	cert, err := os.ReadFile(certPath)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate: %w", err)
+	}
+
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read key: %w", err)
+	}
+
+	certificates := new(Certificate)
+	certificates.Certificate = base64.StdEncoding.EncodeToString(cert)
+	certificates.PrivateKey = base64.StdEncoding.EncodeToString(key)
+
+	d, err := json.Marshal(certificates)
+	if err != nil {
+		return fmt.Errorf("failed to marshal certificate: %w", err)
+	}
+
+	err = os.WriteFile("cert.json", d, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write certificate to file: %w", err)
+	}
+
+	return nil
 }
