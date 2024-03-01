@@ -389,9 +389,11 @@ func (p *HttpProvider) CleanUp(domain, token, _ string) error {
 
 // NewPotentiallyInsecureTransport returns a http.RoundTripper that allows insecure connections to private IP addresses
 func NewPotentiallyInsecureTransport(insecure bool) http.RoundTripper {
+	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+
 	// Same Config as DefaultTransport but allows us to set the TLS config
 	transport := &http.Transport{
-		DialContext:           net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}.DialContext,
+		DialContext:           dialer.DialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
