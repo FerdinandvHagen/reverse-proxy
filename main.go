@@ -36,7 +36,13 @@ func main() {
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
 	transport := NewPotentiallyInsecureTransport(*insecure)
-	proxy.Transport = NewInstrumentedRoundTripper(transport) // magic sauce that enables the telemetry
+
+	cache, err := NewCache(transport)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create cache")
+	}
+
+	proxy.Transport = NewInstrumentedRoundTripper(cache) // magic sauce that enables the telemetry
 
 	go func() {
 		err = http.ListenAndServe(":9001", promhttp.Handler())

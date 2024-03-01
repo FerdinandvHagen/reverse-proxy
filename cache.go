@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/dgraph-io/ristretto"
 	"github.com/prometheus/client_golang/prometheus"
+	"io"
 	"net/http"
 )
 
@@ -30,14 +32,48 @@ func init() {
 
 type Cache struct {
 	transport http.RoundTripper
-	cache     ristretto.Cache
-	whitelist []string
+	cache     *ristretto.Cache
 }
 
 // NewCache wraps the provided http.RoundTripper with a caching layer and returns a cached round tripper.
-func NewCache(transport http.RoundTripper, whitelist []string) http.RoundTripper {
+func NewCache(transport http.RoundTripper) (http.RoundTripper, error) {
+	cache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1e7,     // number of keys to track frequency of (10M).
+		MaxCost:     1 << 30, // maximum cost of cache (1GB).
+		BufferItems: 64,      // number of keys per Get buffer.
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cache: %w", err)
+	}
+
 	return &Cache{
-		whitelist: whitelist,
+		transport: transport,
+		cache:     cache,
+	}, nil
+}
+
+type cachedResponse struct {
+	*http.Response
+	content []byte
+}
+
+func (rc *cachedResponse) ToResponse() *http.Response {
+	return &http.Response{
+		Status:           rc.Response.Status,
+		StatusCode:       rc.Response.StatusCode,
+		Proto:            rc.Response.Proto,
+		ProtoMajor:       rc.Response.ProtoMajor,
+		ProtoMinor:       rc.Response.ProtoMinor,
+		Header:           rc.Response.Header.Clone(),
+		Body:             io.NopCloser(bytes.NewBuffer(rc.content)),
+		ContentLength:    rc.Response.ContentLength,
+		TransferEncoding: rc.Response.TransferEncoding,
+		Close:            rc.Response.Close,
+		Uncompressed:     rc.Response.Uncompressed,
+		Trailer:          rc.Response.Trailer,
+		Request:          rc.Response.Request,
+		TLS:              rc.Response.TLS,
 	}
 }
 
@@ -45,24 +81,44 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 	cacheRequests.WithLabelValues().Inc()
 
 	cacheKey := request.Method + ":" + request.URL.String()
-	sessionId := request.Header.Get("PHPSESSID")
 
-	fmt.Println("Cache key:", cacheKey)
-	fmt.Println("Session ID:", sessionId)
+	d, ok := c.cache.Get(cacheKey)
+	if ok {
+		cacheHits.WithLabelValues().Inc()
+		return d.(*cachedResponse).ToResponse(), nil
+	}
 
-	whitelistKey := request.Method + ":" + request.URL.Path
+	contentType := request.Header.Get("Content-Type")
 
-	// Check if the request is whitelisted
-	whitelisted := false
-	for _, w := range c.whitelist {
-		if w == whitelistKey {
-			whitelisted = true
+	allowed := false
+	for _, ct := range []string{"application/javascript", "text/css", "image/png", "application/font-woff", "image/x-icon"} {
+		if ct == contentType {
+			allowed = true
 		}
 	}
 
-	if !whitelisted {
+	if !allowed {
 		return c.transport.RoundTrip(request)
 	}
 
-	return c.transport.RoundTrip(request)
+	response, err := c.transport.RoundTrip(request)
+	if err != nil || response.StatusCode != http.StatusOK {
+		return response, err
+	}
+
+	content, err := io.ReadAll(response.Body)
+	if err != nil {
+		return response, err
+	}
+
+	response.Body = io.NopCloser(bytes.NewBuffer(content))
+
+	finalResp := &cachedResponse{
+		Response: response,
+		content:  content,
+	}
+
+	c.cache.Set(cacheKey, finalResp, int64(len(content)))
+
+	return response, nil
 }
