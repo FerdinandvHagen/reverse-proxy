@@ -59,13 +59,16 @@ type cachedResponse struct {
 }
 
 func (rc *cachedResponse) ToResponse() *http.Response {
+	header := rc.Response.Header.Clone()
+	header.Set("X-Cache", "HIT")
+
 	return &http.Response{
 		Status:           rc.Response.Status,
 		StatusCode:       rc.Response.StatusCode,
 		Proto:            rc.Response.Proto,
 		ProtoMajor:       rc.Response.ProtoMajor,
 		ProtoMinor:       rc.Response.ProtoMinor,
-		Header:           rc.Response.Header.Clone(),
+		Header:           header,
 		Body:             io.NopCloser(bytes.NewBuffer(rc.content)),
 		ContentLength:    rc.Response.ContentLength,
 		TransferEncoding: rc.Response.TransferEncoding,
