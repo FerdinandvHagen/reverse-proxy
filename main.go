@@ -34,7 +34,9 @@ func main() {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
-	proxy.Transport = NewInstrumentedRoundTripper(*insecure) // magic sauce that enables the telemetry
+
+	transport := NewPotentiallyInsecureTransport(*insecure)
+	proxy.Transport = NewInstrumentedRoundTripper(transport) // magic sauce that enables the telemetry
 
 	go func() {
 		err = http.ListenAndServe(":9001", promhttp.Handler())

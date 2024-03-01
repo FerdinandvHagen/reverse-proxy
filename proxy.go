@@ -1,9 +1,7 @@
 package main
 
 import (
-	"crypto/tls"
 	"github.com/prometheus/client_golang/prometheus"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,32 +29,9 @@ type InstrumentedRoundTripper struct {
 	Transport http.RoundTripper
 }
 
-func NewInstrumentedRoundTripper(insecure bool) *InstrumentedRoundTripper {
-	// Same Config as DefaultTransport but allows us to set the TLS config
-	transport := &http.Transport{
-		DialContext:           net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}.DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	if insecure {
-		// Allows insecure connection to private IP addresses if enabled
-		transport.TLSClientConfig = &tls.Config{
-			GetConfigForClient: func(info *tls.ClientHelloInfo) (*tls.Config, error) {
-				addr, ok := info.Conn.RemoteAddr().(*net.TCPAddr)
-
-				if ok && addr.IP.IsPrivate() {
-					return &tls.Config{
-						InsecureSkipVerify: true,
-					}, nil
-				}
-
-				return &tls.Config{}, nil
-			},
-		}
+func NewInstrumentedRoundTripper(transport http.RoundTripper) *InstrumentedRoundTripper {
+	if transport == nil {
+		transport = http.DefaultTransport
 	}
 
 	return &InstrumentedRoundTripper{

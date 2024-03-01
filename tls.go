@@ -17,6 +17,7 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -384,4 +385,36 @@ func (p *HttpProvider) CleanUp(domain, token, _ string) error {
 
 	delete(p.keys, domain+"-"+token)
 	return nil
+}
+
+// NewPotentiallyInsecureTransport returns a http.RoundTripper that allows insecure connections to private IP addresses
+func NewPotentiallyInsecureTransport(insecure bool) http.RoundTripper {
+	// Same Config as DefaultTransport but allows us to set the TLS config
+	transport := &http.Transport{
+		DialContext:           net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	if insecure {
+		// Allows insecure connection to private IP addresses if enabled
+		transport.TLSClientConfig = &tls.Config{
+			GetConfigForClient: func(info *tls.ClientHelloInfo) (*tls.Config, error) {
+				addr, ok := info.Conn.RemoteAddr().(*net.TCPAddr)
+
+				if ok && addr.IP.IsPrivate() {
+					return &tls.Config{
+						InsecureSkipVerify: true,
+					}, nil
+				}
+
+				return &tls.Config{}, nil
+			},
+		}
+	}
+
+	return transport
 }
