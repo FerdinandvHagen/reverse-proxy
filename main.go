@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/CAFxX/httpcompression"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"net/http"
@@ -44,6 +45,11 @@ func main() {
 
 	proxy.Transport = NewInstrumentedRoundTripper(cache) // magic sauce that enables the telemetry
 
+	compress, err := httpcompression.DefaultAdapter()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create compression adapter")
+	}
+
 	go func() {
 		err = http.ListenAndServe(":9001", promhttp.Handler())
 		if err != nil {
@@ -68,7 +74,7 @@ func main() {
 	// Start the HTTPS server
 	srv := &http.Server{
 		Addr:      ":443",
-		Handler:   proxy,
+		Handler:   compress(proxy),
 		TLSConfig: config,
 	}
 
