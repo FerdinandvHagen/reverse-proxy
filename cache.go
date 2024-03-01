@@ -92,7 +92,13 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 		return d.(*cachedResponse).ToResponse(), nil
 	}
 
-	contentType := request.Header.Get("Content-Type")
+	response, err := c.transport.RoundTrip(request)
+	if err != nil || response.StatusCode != http.StatusOK {
+		log.Info().Err(err).Int("status", response.StatusCode).Msg("not caching")
+		return response, err
+	}
+
+	contentType := response.Header.Get("Content-Type")
 
 	allowed := false
 	for _, ct := range []string{"application/javascript", "text/css", "image/png", "application/font-woff", "image/x-icon"} {
@@ -104,12 +110,6 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 	if !allowed {
 		log.Info().Str("content-type", contentType).Msg("not caching")
 		return c.transport.RoundTrip(request)
-	}
-
-	response, err := c.transport.RoundTrip(request)
-	if err != nil || response.StatusCode != http.StatusOK {
-		log.Info().Err(err).Int("status", response.StatusCode).Msg("not caching")
-		return response, err
 	}
 
 	content, err := io.ReadAll(response.Body)
