@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dgraph-io/ristretto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
 )
@@ -101,16 +102,19 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 
 	if !allowed {
+		log.Info().Str("content-type", contentType).Msg("not caching")
 		return c.transport.RoundTrip(request)
 	}
 
 	response, err := c.transport.RoundTrip(request)
 	if err != nil || response.StatusCode != http.StatusOK {
+		log.Info().Err(err).Int("status", response.StatusCode).Msg("not caching")
 		return response, err
 	}
 
 	content, err := io.ReadAll(response.Body)
 	if err != nil {
+		log.Info().Err(err).Msg("failed to read response body")
 		return response, err
 	}
 
@@ -121,7 +125,10 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 		content:  content,
 	}
 
-	c.cache.Set(cacheKey, finalResp, int64(len(content)))
+	ok = c.cache.Set(cacheKey, finalResp, int64(len(content)))
+	if !ok {
+		log.Info().Msg("cache set failed")
+	}
 
 	return response, nil
 }
