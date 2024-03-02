@@ -61,8 +61,8 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 
 	// Overly secure path extraction
 	path := "/"
-	if req.URL != nil {
-		path = req.URL.Path
+	if req.URL != nil && req.URL.Path != "" {
+		path = cleanupPath(req.URL.Path)
 	}
 
 	status := strconv.Itoa(res.StatusCode)
