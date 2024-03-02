@@ -4,15 +4,15 @@ import "testing"
 
 func TestCleanupPath(t *testing.T) {
 	testStrings := []string{
-		"/api/rest/1",
-		"/api/rest/1/3",
-		"/api/rest/1/locations/1234/rooms/5678",
+		"/rest/api/1",
+		"/rest/api/1/3",
+		"/rest/api/1/locations/1234/rooms/5678",
 	}
 
 	expected := []string{
-		"/api/rest/1",
-		"/api/rest/1/_",
-		"/api/rest/1/locations/_/rooms/_",
+		"/rest/api/1",
+		"/rest/api/1/_",
+		"/rest/api/1/locations/_/rooms/_",
 	}
 
 	for i, s := range testStrings {

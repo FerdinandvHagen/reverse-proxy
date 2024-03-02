@@ -77,12 +77,12 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 }
 
 func cleanupPath(path string) string {
-	if !strings.HasPrefix(path, "/api/rest") {
+	if !strings.HasPrefix(path, "/rest/api") {
 		return path
 	}
 
 	version := strings.Split(path, "/")[3]
-	remainder := strings.TrimPrefix(path, "/api/rest/"+version)
+	remainder := strings.TrimPrefix(path, "/rest/api/"+version)
 
-	return "/api/rest/" + version + repl.ReplaceAllString(remainder, "_")
+	return "/rest/api/" + version + repl.ReplaceAllString(remainder, "_")
 }
