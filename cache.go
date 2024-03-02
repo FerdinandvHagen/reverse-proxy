@@ -94,7 +94,6 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 
 	response, err := c.transport.RoundTrip(request)
 	if err != nil || response.StatusCode != http.StatusOK {
-		log.Info().Err(err).Int("status", response.StatusCode).Msg("not caching")
 		return response, err
 	}
 
@@ -108,7 +107,6 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 
 	if !allowed {
-		log.Info().Str("content-type", contentType).Msg("not caching")
 		return response, err
 	}
 
@@ -125,10 +123,7 @@ func (c *Cache) RoundTrip(request *http.Request) (*http.Response, error) {
 		content:  content,
 	}
 
-	ok = c.cache.Set(cacheKey, finalResp, int64(len(content)))
-	if !ok {
-		log.Info().Msg("cache set failed")
-	}
+	c.cache.Set(cacheKey, finalResp, int64(len(content)))
 
 	return response, nil
 }

@@ -3,8 +3,14 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
+)
+
+var (
+	repl = regexp.MustCompile(`\d+`)
 )
 
 var totalRequests = prometheus.NewCounterVec(
@@ -68,4 +74,15 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	httpDuration.WithLabelValues(method, path).Observe(duration.Seconds())
 
 	return res, err
+}
+
+func cleanupPath(path string) string {
+	if !strings.HasPrefix(path, "/api/rest") {
+		return path
+	}
+
+	version := strings.Split(path, "/")[3]
+	remainder := strings.TrimPrefix(path, "/api/rest/"+version)
+
+	return "/api/rest/" + version + repl.ReplaceAllString(remainder, "_")
 }
