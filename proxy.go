@@ -55,7 +55,7 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	res, err := transport.RoundTrip(req)
 	duration := time.Since(start)
 
-	if err != nil || res == nil {
+	if err != nil || res == nil || !strings.HasPrefix(req.URL.Path, "/rest/api") {
 		return res, err
 	}
 
