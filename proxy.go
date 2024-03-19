@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,6 +74,10 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 
 	totalRequests.WithLabelValues(method, path, status).Inc()
 	httpDuration.WithLabelValues(method, path).Observe(duration.Seconds())
+
+	if os.Getenv("DEBUG") == "true" && path == "/rest/api/1/locations/_/tasks" {
+		fmt.Println("Request: ", res.StatusCode, req.URL.Path, req.RemoteAddr)
+	}
 
 	return res, err
 }
