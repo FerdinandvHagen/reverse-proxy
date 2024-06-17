@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/CAFxX/httpcompression"
+	"github.com/ferdinandvhagen/reverse-proxy/commands"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"net/http"
@@ -23,13 +23,11 @@ var (
 	version    = flag.Bool("version", false, "print version and exit")
 )
 
-var Version = "dev-build"
-
 func main() {
 	flag.Parse()
 
 	if *version {
-		fmt.Println("Version", Version)
+		commands.PrintVersion()
 		return
 	}
 

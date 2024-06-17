@@ -50,14 +50,4 @@ do
         echo 'An error has occurred! Aborting the script execution...'
         exit 1
     fi
-
-    pushd release > /dev/null
-    if [ $os = "windows" ]; then
-        zip $zip_name.zip $output_name
-        rm $output_name
-    else
-        chmod a+x $output_name
-        gzip $output_name
-    fi
-    popd > /dev/null
 done
