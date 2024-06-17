@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
-	"os"
+	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,6 +13,7 @@ import (
 
 var (
 	repl = regexp.MustCompile(`\d+`)
+	uid  = regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
 )
 
 var totalRequests = prometheus.NewCounterVec(
@@ -34,16 +35,22 @@ func init() {
 }
 
 type InstrumentedRoundTripper struct {
-	Transport http.RoundTripper
+	Transport  http.RoundTripper
+	prefix     string
+	hasVersion bool
+	excluded   []string
 }
 
-func NewInstrumentedRoundTripper(transport http.RoundTripper) *InstrumentedRoundTripper {
+func NewInstrumentedRoundTripper(transport http.RoundTripper, prefix string, hasVersion bool, excluded []string) *InstrumentedRoundTripper {
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
 
 	return &InstrumentedRoundTripper{
-		Transport: transport,
+		Transport:  transport,
+		prefix:     prefix,
+		hasVersion: hasVersion,
+		excluded:   excluded,
 	}
 }
 
@@ -57,14 +64,9 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	res, err := transport.RoundTrip(req)
 	duration := time.Since(start)
 
-	if err != nil || res == nil || !strings.HasPrefix(req.URL.Path, "/rest/api") {
+	s, ok := cleanupPath(req.URL, p.prefix, p.hasVersion, p.excluded)
+	if !ok {
 		return res, err
-	}
-
-	// Overly secure path extraction
-	path := "/"
-	if req.URL != nil && req.URL.Path != "" {
-		path = cleanupPath(req.URL.Path)
 	}
 
 	status := strconv.Itoa(res.StatusCode)
@@ -72,23 +74,51 @@ func (p *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 
 	method := req.Method
 
-	totalRequests.WithLabelValues(method, path, status).Inc()
-	httpDuration.WithLabelValues(method, path).Observe(duration.Seconds())
-
-	if os.Getenv("DEBUG") == "true" && path == "/rest/api/1/locations/_/tasks" {
-		fmt.Println("Request: ", res.StatusCode, req.URL.Path, req.RemoteAddr)
-	}
+	totalRequests.WithLabelValues(method, s, status).Inc()
+	httpDuration.WithLabelValues(method, s).Observe(duration.Seconds())
 
 	return res, err
 }
 
-func cleanupPath(path string) string {
-	if !strings.HasPrefix(path, "/rest/api") {
-		return path
+func cleanupPath(url *url.URL, prefix string, hasVersion bool, excluded []string) (string, bool) {
+	prefix = strings.TrimSuffix(prefix, "/")
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
 	}
 
-	version := strings.Split(path, "/")[3]
-	remainder := strings.TrimPrefix(path, "/rest/api/"+version)
+	if url == nil {
+		return "", false
+	}
 
-	return "/rest/api/" + version + repl.ReplaceAllString(remainder, "_")
+	// only allow paths that start with the prefix
+	uri := url.Path
+	if !strings.HasPrefix(uri, prefix) {
+		return "", false
+	}
+
+	// exclude paths that contain any of the excluded strings
+	for _, e := range excluded {
+		if ok, _ := path.Match(e, uri); ok {
+			return "", false
+		}
+	}
+
+	// extract version
+	version := ""
+	remainder := strings.TrimPrefix(strings.TrimPrefix(uri, prefix), "/")
+	if hasVersion {
+		version = strings.Split(remainder, "/")[0]
+		remainder = strings.TrimPrefix(remainder, version)
+	}
+
+	remainder = strings.TrimPrefix(remainder, "/")
+	uuidReplaced := uid.ReplaceAllString(remainder, "_")
+	numbersReplaced := repl.ReplaceAllString(uuidReplaced, "_")
+
+	res := strings.Join([]string{prefix, numbersReplaced}, "/")
+	if hasVersion {
+		res = strings.Join([]string{prefix, version, numbersReplaced}, "/")
+	}
+
+	return strings.TrimSuffix(res, "/"), true
 }

@@ -12,10 +12,13 @@ import (
 )
 
 var (
-	upstream = flag.String("upstream", "http://localhost:8081", "remote server")
-	email    = flag.String("email", "", "email address")
-	domains  = flag.String("domains", "", "comma separated list of domains")
-	insecure = flag.Bool("insecure", false, "accept invalid SSL certificates from the upstream server")
+	upstream   = flag.String("upstream", "http://localhost:8081", "remote server")
+	email      = flag.String("email", "", "email address")
+	domains    = flag.String("domains", "", "comma separated list of domains")
+	insecure   = flag.Bool("insecure", false, "accept invalid SSL certificates from the upstream server")
+	prefix     = flag.String("prefix", "", "prefix that needs to be present in the path")
+	hasVersion = flag.Bool("hasVersion", false, "whether the path has a version following the prefix")
+	excluded   = flag.String("excluded", "", "comma separated list of paths to exclude from metrics")
 )
 
 func main() {
@@ -29,6 +32,8 @@ func main() {
 		log.Fatal().Msg("domains are required")
 	}
 
+	excludedPaths := strings.Split(*excluded, ",")
+
 	remote, err := url.Parse(*upstream)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to parse remote URL")
@@ -37,13 +42,7 @@ func main() {
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
 	transport := NewPotentiallyInsecureTransport(*insecure)
-
-	cache, err := NewCache(transport)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create cache")
-	}
-
-	proxy.Transport = NewInstrumentedRoundTripper(cache) // magic sauce that enables the telemetry
+	proxy.Transport = NewInstrumentedRoundTripper(transport, *prefix, *hasVersion, excludedPaths) // magic sauce that enables the telemetry
 
 	compress, err := httpcompression.DefaultAdapter()
 	if err != nil {
