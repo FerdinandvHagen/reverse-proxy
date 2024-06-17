@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/CAFxX/httpcompression"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
@@ -19,10 +20,18 @@ var (
 	prefix     = flag.String("prefix", "", "prefix that needs to be present in the path")
 	hasVersion = flag.Bool("hasVersion", false, "whether the path has a version following the prefix")
 	excluded   = flag.String("excluded", "", "comma separated list of paths to exclude from metrics")
+	version    = flag.Bool("version", false, "print version and exit")
 )
+
+var Version = "dev-build"
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		fmt.Println("Version", Version)
+		return
+	}
 
 	if *email == "" {
 		log.Fatal().Msg("email is required")

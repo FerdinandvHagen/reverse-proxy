@@ -9,7 +9,7 @@ if [[ -z "$version" ]]; then
   echo "usage: $0 <version>"
   exit 1
 fi
-package_name=rodeo
+package_name=proxy
 
 #
 # The full list of the platforms is at: https://golang.org/doc/install/source#environment
@@ -44,7 +44,7 @@ do
 
     echo "Building release/$output_name..."
     env GOOS=$GOOS GOARCH=$GOARCH go build \
-      -ldflags "-X github.com/akrabat/rodeo/commands.Version=$version" \
+      -ldflags "-X github.com/ferdinandvhagen/reverse-proxy.Version=$version" \
       -o release/$output_name
     if [ $? -ne 0 ]; then
         echo 'An error has occurred! Aborting the script execution...'

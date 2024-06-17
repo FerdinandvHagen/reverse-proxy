@@ -1,4 +1,4 @@
-module proxy
+module github.com/ferdinandvhagen/reverse-proxy
 
 go 1.21
 
